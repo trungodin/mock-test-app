@@ -484,8 +484,18 @@ export default function TestSession({ test }: TestSessionProps) {
         </div>
         
         {!isSubmitted && (
-          <div className={`${styles.timer} ${timeLeft < 300 ? styles.timerWarning : ''}`}>
-            ⏱ {formatTime(timeLeft)}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div className={`${styles.timer} ${timeLeft < 300 ? styles.timerWarning : ''}`}>
+              ⏱ {formatTime(timeLeft)}
+            </div>
+            <button 
+              className={styles.submitBtn} 
+              onClick={handleSubmit} 
+              disabled={isSubmitting}
+              style={{ margin: 0, padding: '0.6rem 1.2rem', fontSize: '0.95rem' }}
+            >
+              {isSubmitting ? "Đang nộp..." : "Nộp bài"}
+            </button>
           </div>
         )}
       </header>
@@ -522,14 +532,6 @@ export default function TestSession({ test }: TestSessionProps) {
           )}
 
           {test.questions.map((q: any) => renderQuestionBlock(q))}
-
-          {!isSubmitted && (
-            <div className={styles.actions}>
-              <button className={styles.submitBtn} onClick={handleSubmit} disabled={isSubmitting}>
-                {isSubmitting ? "Đang nộp..." : "Nộp bài & Chấm điểm"}
-              </button>
-            </div>
-          )}
         </div>
       </main>
     </div>
