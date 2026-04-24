@@ -126,12 +126,12 @@ export default function KeyManager({ tests }: { tests: any[] }) {
               <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontWeight: '600', color: '#4b5563', fontSize: '0.9rem' }}>{item.label}</label>
                 {item.isText ? (
-                  <input 
-                    type="text" 
+                  <textarea 
                     value={answers[item.id] || ''}
                     onChange={(e) => handleChange(item.id, e.target.value)}
-                    placeholder="Nhập chữ..."
-                    style={{ padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '4px' }}
+                    placeholder="Ngăn cách bằng dấu / hoặc xuống dòng"
+                    rows={2}
+                    style={{ padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '4px', resize: 'vertical' }}
                   />
                 ) : (
                   <div style={{ display: 'flex', gap: '0.25rem' }}>

@@ -8,6 +8,13 @@ interface TestSessionProps {
   test: any;
 }
 
+const checkAnswerMatch = (userAns: string | undefined, correctAns: string | undefined) => {
+  if (!userAns || !correctAns) return false;
+  const acceptable = correctAns.split(/[\/\n|]/).map(s => s.trim().toLowerCase()).filter(s => s);
+  const uAnsClean = userAns.trim().toLowerCase().replace(/\.$/, '');
+  return acceptable.some(ans => ans.replace(/\.$/, '') === uAnsClean);
+};
+
 export default function TestSession({ test }: TestSessionProps) {
   // Onboarding state
   const [studentName, setStudentName] = useState('');
@@ -93,18 +100,18 @@ export default function TestSession({ test }: TestSessionProps) {
           for(let i=1; i<=6; i++) {
              const key = `17.${i}`;
              const correctAns = fetchedKeys[key] || q.subQuestions?.find((sq:any)=>sq.id===key)?.answer;
-             if (userAnswers[key] && correctAns && userAnswers[key].toLowerCase() === correctAns.toLowerCase()) correctCount++;
+             if (checkAnswerMatch(userAnswers[key], correctAns)) correctCount++;
           }
        } else if (q.id === "30") {
           for(let i=1; i<=2; i++) {
              const key = `30.${i}`;
              const correctAns = fetchedKeys[key];
-             if (userAnswers[key] && correctAns && userAnswers[key].toLowerCase() === correctAns.toLowerCase()) correctCount++;
+             if (checkAnswerMatch(userAnswers[key], correctAns)) correctCount++;
           }
        } else {
           const ans = userAnswers[q.id];
           const correctAns = fetchedKeys[q.id] || q.answer;
-          if (ans && correctAns && ans.toLowerCase() === (correctAns || "").toLowerCase()) {
+          if (checkAnswerMatch(ans, correctAns)) {
               correctCount++;
           }
        }
@@ -242,7 +249,7 @@ export default function TestSession({ test }: TestSessionProps) {
             {Object.entries(q.options || {}).map(([key, val]) => {
                const isSelected = userAnswers[q.id] === key;
                const correctAns = officialKeys[q.id] || q.answer;
-               const isCorrect = isSubmitted && correctAns === key;
+               const isCorrect = isSubmitted && checkAnswerMatch(key, correctAns);
                const isWrongSelected = isSubmitted && isSelected && !isCorrect;
 
                let rowClass = styles.optionRow;
@@ -267,7 +274,7 @@ export default function TestSession({ test }: TestSessionProps) {
                {['A', 'B', 'C', 'D'].map(key => {
                   const isSelected = userAnswers[q.id] === key;
                   const correctAns = officialKeys[q.id] || q.answer;
-                  const isCorrect = isSubmitted && correctAns === key;
+                  const isCorrect = isSubmitted && checkAnswerMatch(key, correctAns);
                   const isWrongSelected = isSubmitted && isSelected && !isCorrect;
                   
                   let btnClass = styles.letterBtn;
@@ -320,7 +327,7 @@ export default function TestSession({ test }: TestSessionProps) {
                     <div style={{display: 'flex', gap: '0.75rem'}}>
                       {['A', 'B', 'C', 'D'].map(key => {
                          const isSelected = userAnswers[subId] === key;
-                         const isCorrect = isSubmitted && correctAns === key;
+                         const isCorrect = isSubmitted && checkAnswerMatch(key, correctAns);
                          const isWrongSelected = isSubmitted && isSelected && !isCorrect;
                          
                          let btnClass = styles.letterBtn;
