@@ -22,6 +22,7 @@ export default function TestSession({ test }: TestSessionProps) {
 
   const [timeLeft, setTimeLeft] = useState(test.timeLimit * 60);
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
+  const [officialKeys, setOfficialKeys] = useState<Record<string, string>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [score, setScore] = useState(0);
 
@@ -70,8 +71,19 @@ export default function TestSession({ test }: TestSessionProps) {
     if (isSubmitted || isSubmitting) return;
     setIsSubmitting(true);
     
-    // In the new JSON, we don't have perfect answers for everything if they were mocked.
-    // We will just do a basic score calculation based on what we have.
+    let fetchedKeys: Record<string, string> = {};
+    try {
+      const keyRes = await fetch(`/api/answer-keys?testId=${test.id}`);
+      if (keyRes.ok) {
+         const keyData = await keyRes.json();
+         if (keyData.answers) fetchedKeys = keyData.answers;
+      }
+    } catch (e) {
+      console.error("Failed to fetch answer key");
+    }
+    
+    setOfficialKeys(fetchedKeys);
+
     let correctCount = 0;
     let totalScoreable = 40; // Hardcoded 40 items
 
@@ -80,16 +92,19 @@ export default function TestSession({ test }: TestSessionProps) {
        if (q.id === "17") {
           for(let i=1; i<=6; i++) {
              const key = `17.${i}`;
-             if (userAnswers[key]) correctCount++; // naive mock
+             const correctAns = fetchedKeys[key] || q.subQuestions?.find((sq:any)=>sq.id===key)?.answer;
+             if (userAnswers[key] && correctAns && userAnswers[key].toLowerCase() === correctAns.toLowerCase()) correctCount++;
           }
        } else if (q.id === "30") {
           for(let i=1; i<=2; i++) {
              const key = `30.${i}`;
-             if (userAnswers[key]) correctCount++;
+             const correctAns = fetchedKeys[key];
+             if (userAnswers[key] && correctAns && userAnswers[key].toLowerCase() === correctAns.toLowerCase()) correctCount++;
           }
        } else {
           const ans = userAnswers[q.id];
-          if (ans && ans.toLowerCase() === (q.answer || "").toLowerCase()) {
+          const correctAns = fetchedKeys[q.id] || q.answer;
+          if (ans && correctAns && ans.toLowerCase() === (correctAns || "").toLowerCase()) {
               correctCount++;
           }
        }
@@ -127,6 +142,7 @@ export default function TestSession({ test }: TestSessionProps) {
 
   const handleRetry = () => {
     setUserAnswers({});
+    setOfficialKeys({});
     setTimeLeft(test.timeLimit * 60);
     setIsSubmitted(false);
     setScore(0);
@@ -225,7 +241,8 @@ export default function TestSession({ test }: TestSessionProps) {
           <div className={styles.optionsContainer}>
             {Object.entries(q.options || {}).map(([key, val]) => {
                const isSelected = userAnswers[q.id] === key;
-               const isCorrect = isSubmitted && q.answer === key;
+               const correctAns = officialKeys[q.id] || q.answer;
+               const isCorrect = isSubmitted && correctAns === key;
                const isWrongSelected = isSubmitted && isSelected && !isCorrect;
 
                let rowClass = styles.optionRow;
@@ -249,10 +266,19 @@ export default function TestSession({ test }: TestSessionProps) {
              <div style={{display: 'flex', gap: '1rem'}}>
                {['A', 'B', 'C', 'D'].map(key => {
                   const isSelected = userAnswers[q.id] === key;
+                  const correctAns = officialKeys[q.id] || q.answer;
+                  const isCorrect = isSubmitted && correctAns === key;
+                  const isWrongSelected = isSubmitted && isSelected && !isCorrect;
+                  
+                  let btnClass = styles.letterBtn;
+                  if (isSelected) btnClass += ` ${styles.letterBtnSelected}`;
+                  if (isCorrect) btnClass += ` ${styles.optionCorrect}`;
+                  if (isWrongSelected) btnClass += ` ${styles.optionIncorrect}`;
+
                   return (
                     <button 
                       key={key} 
-                      className={`${styles.letterBtn} ${isSelected ? styles.letterBtnSelected : ''}`}
+                      className={btnClass}
                       onClick={() => handleSelectAnswer(q.id, key)}
                     >
                       {key}
@@ -285,19 +311,28 @@ export default function TestSession({ test }: TestSessionProps) {
                 </svg>
                 Vui lòng xem chi tiết các đáp án A, B, C, D của câu 17 trong file PDF bên trái.
              </div>
-             {[1,2,3,4,5,6].map(i => {
+              {[1,2,3,4,5,6].map(i => {
                 const subId = `17.${i}`;
+                const correctAns = officialKeys[subId] || q.subQuestions?.find((sq:any)=>sq.id===subId)?.answer;
                 return (
                   <div key={subId} style={{marginBottom: '1.5rem'}}>
                     <div className={styles.subQuestionLabel}>Blank {subId}</div>
                     <div style={{display: 'flex', gap: '0.75rem'}}>
                       {['A', 'B', 'C', 'D'].map(key => {
                          const isSelected = userAnswers[subId] === key;
+                         const isCorrect = isSubmitted && correctAns === key;
+                         const isWrongSelected = isSubmitted && isSelected && !isCorrect;
+                         
+                         let btnClass = styles.letterBtn;
+                         if (isSelected) btnClass += ` ${styles.letterBtnSelected}`;
+                         if (isCorrect) btnClass += ` ${styles.optionCorrect}`;
+                         if (isWrongSelected) btnClass += ` ${styles.optionIncorrect}`;
+
                          return (
                            <button 
                               key={key}
                               onClick={() => handleSelectAnswer(subId, key)}
-                              className={`${styles.letterBtn} ${isSelected ? styles.letterBtnSelected : ''}`}
+                              className={btnClass}
                            >
                              {key}
                            </button>
