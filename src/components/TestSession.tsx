@@ -14,6 +14,12 @@ export default function TestSession({ test }: TestSessionProps) {
   const [isStarted, setIsStarted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Dictionary state
+  const [dictWord, setDictWord] = useState('');
+  const [dictTranslation, setDictTranslation] = useState('');
+  const [dictPos, setDictPos] = useState<{x: number, y: number} | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+
   const [timeLeft, setTimeLeft] = useState(test.timeLimit * 60);
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -25,6 +31,18 @@ export default function TestSession({ test }: TestSessionProps) {
     const timerId = setInterval(() => setTimeLeft((t) => t - 1), 1000);
     return () => clearInterval(timerId);
   }, [timeLeft, isSubmitted, isStarted]);
+
+  // Dictionary click outside listener
+  useEffect(() => {
+    const handleClick = () => {
+      const selection = window.getSelection();
+      if (!selection || selection.toString().trim().length === 0) {
+         setDictPos(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -114,6 +132,58 @@ export default function TestSession({ test }: TestSessionProps) {
     setScore(0);
     setIsStarted(false);
     setStudentName('');
+  };
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    setTimeout(async () => {
+      const selection = window.getSelection();
+      const text = selection?.toString().trim();
+      
+      // If no valid text selected, ignore
+      if (!text || text.length > 30 || text.split(' ').length > 3) {
+         return;
+      }
+      
+      // Basic check if it's mostly english letters (allow hyphen and quote)
+      if (!/^[a-zA-Z\s'-]+$/.test(text)) return;
+
+      const rect = selection?.getRangeAt(0).getBoundingClientRect();
+      if (!rect) return;
+
+      setDictPos({
+        x: rect.left + rect.width / 2 + window.scrollX,
+        y: rect.top + window.scrollY - 10
+      });
+      setDictWord(text);
+      setDictTranslation('');
+      setIsTranslating(true);
+
+      try {
+        const res = await fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ word: text })
+        });
+        const data = await res.json();
+        if (data.translation) {
+           setDictTranslation(data.translation);
+        } else {
+           setDictTranslation('Không tìm thấy bản dịch.');
+        }
+      } catch (err) {
+        setDictTranslation('Lỗi kết nối từ điển.');
+      } finally {
+        setIsTranslating(false);
+      }
+    }, 10);
+  };
+
+  const playAudio = (text: string) => {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      window.speechSynthesis.speak(utterance);
+    }
   };
 
   // Helper to render question blocks
@@ -327,7 +397,46 @@ export default function TestSession({ test }: TestSessionProps) {
   }
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} onMouseUp={handleMouseUp}>
+      {/* Dictionary Tooltip */}
+      {dictPos && (
+        <div 
+          className={styles.dictionaryTooltip} 
+          style={{ left: dictPos.x, top: dictPos.y, transform: 'translate(-50%, -100%)' }}
+          onMouseDown={(e) => e.stopPropagation()} // Prevent click inside from closing it
+        >
+           <div className={styles.dictHeader}>
+              <div className={styles.dictWord}>{dictWord}</div>
+              <button className={styles.dictPronounce} onClick={() => playAudio(dictWord)} title="Phát âm">
+                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                   <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                   <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                 </svg>
+              </button>
+           </div>
+           
+           <div className={styles.dictTranslation}>
+              {isTranslating ? (
+                <span className={styles.dictLoading}>
+                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
+                     <line x1="12" y1="2" x2="12" y2="6"></line>
+                     <line x1="12" y1="18" x2="12" y2="22"></line>
+                     <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+                     <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                     <line x1="2" y1="12" x2="6" y2="12"></line>
+                     <line x1="18" y1="12" x2="22" y2="12"></line>
+                     <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+                     <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+                   </svg>
+                   Đang dịch...
+                </span>
+              ) : (
+                dictTranslation
+              )}
+           </div>
+        </div>
+      )}
+
       <header className={styles.header}>
         <div className={styles.headerLeft}>
           <Link href="/" className={styles.backButton}>
