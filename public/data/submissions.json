@@ -1,0 +1,36 @@
+[
+  {
+    "id": "1777004381911",
+    "submittedAt": "2026-04-24T04:19:41.911Z",
+    "studentName": "bảo ngọc",
+    "testId": "1",
+    "testTitle": "De Luyen Thi Tieng Anh Vao 10 Nam 2025 So Tphcm   De 3",
+    "score": 0.75,
+    "timeTaken": 11,
+    "answers": {
+      "1": "A",
+      "2": "A",
+      "3": "B",
+      "4": "D",
+      "6": "B",
+      "7": "A"
+    }
+  },
+  {
+    "id": "1777004671120",
+    "submittedAt": "2026-04-24T04:24:31.120Z",
+    "studentName": "trungodin",
+    "testId": "1",
+    "testTitle": "De Luyen Thi Tieng Anh Vao 10 Nam 2025 So Tphcm   De 3",
+    "score": 0.75,
+    "timeTaken": 11,
+    "answers": {
+      "1": "A",
+      "2": "A",
+      "4": "D",
+      "7": "A",
+      "9": "D",
+      "13": "B"
+    }
+  }
+]
