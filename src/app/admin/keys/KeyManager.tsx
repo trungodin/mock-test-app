@@ -14,21 +14,24 @@ export default function KeyManager({ tests }: { tests: any[] }) {
   // Extract all scorable keys for the current test
   const getScorableItems = () => {
     if (!selectedTest) return [];
-    const items: { id: string, label: string, isText: boolean }[] = [];
+    const items: { id: string, label: string, isText: boolean, isTF: boolean }[] = [];
+    
+    const isOldTest = !selectedTest.id.toString().startsWith("new_test_");
     
     selectedTest.questions.forEach((q: any) => {
-      const isTextMode = parseInt(q.id) >= 24 && parseInt(q.id) <= 34 && q.id !== "30";
+      const isTextMode = isOldTest ? (parseInt(q.id) >= 24 && parseInt(q.id) <= 34 && q.id !== "30") : (q.type === "text");
+      const isTF = q.type === "true_false";
       
-      if (q.id === "17") {
+      if (q.id === "17" && isOldTest) {
         for(let i=1; i<=6; i++) {
-           items.push({ id: `17.${i}`, label: `Câu 17.${i}`, isText: false });
+           items.push({ id: `17.${i}`, label: `Câu 17.${i}`, isText: false, isTF: false });
         }
-      } else if (q.id === "30") {
+      } else if (q.id === "30" && isOldTest) {
         for(let i=1; i<=2; i++) {
-           items.push({ id: `30.${i}`, label: `Câu 30.${i}`, isText: true });
+           items.push({ id: `30.${i}`, label: `Câu 30.${i}`, isText: true, isTF: false });
         }
       } else {
-         items.push({ id: q.id, label: `Câu ${q.id}`, isText: isTextMode });
+         items.push({ id: q.id, label: `Câu ${q.id}`, isText: isTextMode, isTF });
       }
     });
     return items;
@@ -135,7 +138,7 @@ export default function KeyManager({ tests }: { tests: any[] }) {
                   />
                 ) : (
                   <div style={{ display: 'flex', gap: '0.25rem' }}>
-                    {['A', 'B', 'C', 'D'].map(opt => (
+                    {(item.isTF ? ['True', 'False'] : ['A', 'B', 'C', 'D']).map(opt => (
                       <button
                         key={opt}
                         onClick={() => handleChange(item.id, opt)}

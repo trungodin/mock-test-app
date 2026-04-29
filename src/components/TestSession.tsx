@@ -94,15 +94,17 @@ export default function TestSession({ test }: TestSessionProps) {
     let correctCount = 0;
     let totalScoreable = 40; // Hardcoded 40 items
 
+    const isOldTest = !test.id.toString().startsWith("new_test_");
+
     // Calculate...
     test.questions.forEach((q: any) => {
-       if (q.id === "17") {
+       if (q.id === "17" && isOldTest) {
           for(let i=1; i<=6; i++) {
              const key = `17.${i}`;
              const correctAns = fetchedKeys[key] || q.subQuestions?.find((sq:any)=>sq.id===key)?.answer;
              if (checkAnswerMatch(userAnswers[key], correctAns)) correctCount++;
           }
-       } else if (q.id === "30") {
+       } else if (q.id === "30" && isOldTest) {
           for(let i=1; i<=2; i++) {
              const key = `30.${i}`;
              const correctAns = fetchedKeys[key];
@@ -209,20 +211,18 @@ export default function TestSession({ test }: TestSessionProps) {
     }
   };
 
-  // Helper to render question blocks
   const renderQuestionBlock = (q: any) => {
-    // Determine if it needs text input
-    const isTextMode = parseInt(q.id) >= 24 && parseInt(q.id) <= 34 && q.id !== "30";
-    const isMultipleBlanks = q.id === "17" || q.id === "30";
+    const isOldTest = !test.id.toString().startsWith("new_test_");
+    const isTextMode = isOldTest ? (parseInt(q.id) >= 24 && parseInt(q.id) <= 34 && q.id !== "30") : (q.type === "text");
+    const isMultipleBlanks = isOldTest ? (q.id === "17" || q.id === "30") : false;
 
     let displayPrompt = q.prompt;
     let extraPassage = null;
 
-    if (q.id === "16") {
+    if (isOldTest && q.id === "16") {
       displayPrompt = displayPrompt.replace(/Q17\.\d+\.?\n?/g, '').trim();
     }
-    if (q.id === "17") {
-      // The parser often lumps the reading passage for Q18-23 into Q17.
+    if (isOldTest && q.id === "17") {
       const splitStr = "Read and do the following tasks.";
       const splitIdx = displayPrompt.indexOf(splitStr);
       if (splitIdx !== -1) {
@@ -230,12 +230,76 @@ export default function TestSession({ test }: TestSessionProps) {
         displayPrompt = displayPrompt.substring(0, splitIdx).trim();
       }
     }
-    if (q.id === "34") {
+    if (isOldTest && q.id === "34") {
       const cutIdx = displayPrompt.indexOf("Question 1.");
       if (cutIdx !== -1) {
         displayPrompt = displayPrompt.substring(0, cutIdx).trim();
       }
     }
+
+    // Helper to render A/B/C/D buttons
+    const renderABCDButtons = (qId: string) => (
+      <div className={styles.optionsContainer}>
+        <div style={{display: 'flex', gap: '1rem'}}>
+          {['A', 'B', 'C', 'D'].map(key => {
+            const isSelected = userAnswers[qId] === key;
+            const correctAns = officialKeys[qId] || q.answer;
+            const isCorrect = isSubmitted && checkAnswerMatch(key, correctAns);
+            const isWrongSelected = isSubmitted && isSelected && !isCorrect;
+            let btnClass = styles.letterBtn;
+            if (isSelected) btnClass += ` ${styles.letterBtnSelected}`;
+            if (isCorrect) btnClass += ` ${styles.optionCorrect}`;
+            if (isWrongSelected) btnClass += ` ${styles.optionIncorrect}`;
+            return (
+              <button key={key} className={btnClass} onClick={() => handleSelectAnswer(qId, key)}>
+                {key}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+
+    // Helper to render True/False buttons
+    const renderTrueFalseButtons = (qId: string) => (
+      <div className={styles.optionsContainer}>
+        <div style={{display: 'flex', gap: '1rem'}}>
+          {['True', 'False'].map(key => {
+            const isSelected = userAnswers[qId] === key;
+            const correctAns = officialKeys[qId] || q.answer;
+            const isCorrect = isSubmitted && checkAnswerMatch(key, correctAns);
+            const isWrongSelected = isSubmitted && isSelected && !isCorrect;
+            let btnClass = styles.letterBtn;
+            if (isSelected) btnClass += ` ${styles.letterBtnSelected}`;
+            if (isCorrect) btnClass += ` ${styles.optionCorrect}`;
+            if (isWrongSelected) btnClass += ` ${styles.optionIncorrect}`;
+            return (
+              <button key={key} className={btnClass} style={{ minWidth: '80px', borderRadius: '8px', padding: '0.5rem 1.5rem' }} onClick={() => handleSelectAnswer(qId, key)}>
+                {key}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+
+    // Helper to render text input
+    const renderTextInput = (qId: string) => (
+      <div className={styles.optionsContainer}>
+        <textarea
+          className={styles.textInput}
+          placeholder="Nhập câu trả lời tự luận (có thể nhập nhiều dòng)..."
+          value={userAnswers[qId] || ''}
+          onChange={(e) => handleTextAnswer(qId, e.target.value)}
+          rows={3}
+        />
+        {isSubmitted && (
+          <div className={`${styles.feedbackBox} ${styles.feedbackCorrect}`}>
+            <strong>Ghi nhận:</strong> Câu tự luận cần giáo viên chấm thủ công.
+          </div>
+        )}
+      </div>
+    );
 
     return (
       <React.Fragment key={q.id}>
@@ -243,20 +307,24 @@ export default function TestSession({ test }: TestSessionProps) {
         <div className={styles.questionLabel}>Question {q.id}</div>
         <div className={styles.prompt}>{displayPrompt}</div>
         
-        {/* If it's a standard MCQ */}
-        {q.type === "mcq" && !isMultipleBlanks && !isTextMode && (
+        {/* === NEW TESTS: type-driven rendering === */}
+        {q.type === "mcq_abcd" && renderABCDButtons(q.id)}
+        {q.type === "true_false" && renderTrueFalseButtons(q.id)}
+        {q.type === "text" && !isOldTest && renderTextInput(q.id)}
+
+        {/* === OLD TESTS: position-based rendering === */}
+        {/* Old MCQ with real parsed options */}
+        {q.type === "mcq" && !isMultipleBlanks && !isTextMode && (!q.options?.A || q.options.A !== "Đáp án A") && (
           <div className={styles.optionsContainer}>
             {Object.entries(q.options || {}).map(([key, val]) => {
                const isSelected = userAnswers[q.id] === key;
                const correctAns = officialKeys[q.id] || q.answer;
                const isCorrect = isSubmitted && checkAnswerMatch(key, correctAns);
                const isWrongSelected = isSubmitted && isSelected && !isCorrect;
-
                let rowClass = styles.optionRow;
                if (isSelected) rowClass += ` ${styles.optionSelected}`;
                if (isCorrect) rowClass += ` ${styles.optionCorrect}`;
                if (isWrongSelected) rowClass += ` ${styles.optionIncorrect}`;
-
                return (
                   <div key={key} className={rowClass} onClick={() => handleSelectAnswer(q.id, key)}>
                     <span className={styles.optionLabel}>{key}.</span>
@@ -267,37 +335,11 @@ export default function TestSession({ test }: TestSessionProps) {
           </div>
         )}
 
-        {/* If options failed to parse but it's 1-16 or 18-23, show A B C D buttons */}
-        {q.type === "text" && !isMultipleBlanks && !isTextMode && (
-           <div className={styles.optionsContainer}>
-             <div style={{display: 'flex', gap: '1rem'}}>
-               {['A', 'B', 'C', 'D'].map(key => {
-                  const isSelected = userAnswers[q.id] === key;
-                  const correctAns = officialKeys[q.id] || q.answer;
-                  const isCorrect = isSubmitted && checkAnswerMatch(key, correctAns);
-                  const isWrongSelected = isSubmitted && isSelected && !isCorrect;
-                  
-                  let btnClass = styles.letterBtn;
-                  if (isSelected) btnClass += ` ${styles.letterBtnSelected}`;
-                  if (isCorrect) btnClass += ` ${styles.optionCorrect}`;
-                  if (isWrongSelected) btnClass += ` ${styles.optionIncorrect}`;
+        {/* Old MCQ fallback (dummy options or text type that should be MCQ) */}
+        {isOldTest && ((q.type === "text" && !isMultipleBlanks && !isTextMode) || (q.type === "mcq" && q.options?.A === "Đáp án A")) && renderABCDButtons(q.id)}
 
-                  return (
-                    <button 
-                      key={key} 
-                      className={btnClass}
-                      onClick={() => handleSelectAnswer(q.id, key)}
-                    >
-                      {key}
-                    </button>
-                  )
-               })}
-             </div>
-           </div>
-        )}
-
-        {/* Multiple blanks like Q17 */}
-        {q.id === "17" && (
+        {/* Old Q17: Multiple blanks */}
+        {q.id === "17" && isOldTest && (
            <div className={styles.subQuestionBlock}>
              <div style={{
                 background: 'var(--primary-light)',
@@ -329,18 +371,12 @@ export default function TestSession({ test }: TestSessionProps) {
                          const isSelected = userAnswers[subId] === key;
                          const isCorrect = isSubmitted && checkAnswerMatch(key, correctAns);
                          const isWrongSelected = isSubmitted && isSelected && !isCorrect;
-                         
                          let btnClass = styles.letterBtn;
                          if (isSelected) btnClass += ` ${styles.letterBtnSelected}`;
                          if (isCorrect) btnClass += ` ${styles.optionCorrect}`;
                          if (isWrongSelected) btnClass += ` ${styles.optionIncorrect}`;
-
                          return (
-                           <button 
-                              key={key}
-                              onClick={() => handleSelectAnswer(subId, key)}
-                              className={btnClass}
-                           >
+                           <button key={key} onClick={() => handleSelectAnswer(subId, key)} className={btnClass}>
                              {key}
                            </button>
                          )
@@ -352,8 +388,8 @@ export default function TestSession({ test }: TestSessionProps) {
            </div>
         )}
 
-        {/* Multiple blanks like Q30 (Text) */}
-        {q.id === "30" && (
+        {/* Old Q30: Multiple text blanks */}
+        {q.id === "30" && isOldTest && (
            <div className={styles.subQuestionBlock}>
              {[1,2].map(i => {
                 const subId = `30.${i}`;
@@ -372,23 +408,8 @@ export default function TestSession({ test }: TestSessionProps) {
            </div>
         )}
 
-        {/* Text Mode (Sentence Rewrite, Word Form) */}
-        {isTextMode && (
-           <div className={styles.optionsContainer}>
-             <textarea 
-               className={styles.textInput}
-               placeholder="Nhập câu trả lời tự luận (có thể nhập nhiều dòng)..."
-               value={userAnswers[q.id] || ''}
-               onChange={(e) => handleTextAnswer(q.id, e.target.value)}
-               rows={3}
-             />
-             {isSubmitted && (
-                <div className={`${styles.feedbackBox} ${styles.feedbackCorrect}`}>
-                   <strong>Ghi nhận:</strong> Câu tự luận cần giáo viên chấm thủ công.
-                </div>
-             )}
-           </div>
-        )}
+        {/* Old Text Mode (Sentence Rewrite, Word Form) */}
+        {isOldTest && isTextMode && renderTextInput(q.id)}
       </div>
       
       {extraPassage && (
